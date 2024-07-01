@@ -1,0 +1,47 @@
+dist: bionic
+language: node_js
+node_js: '16'
+
+services:
+  - docker
+
+branches:
+  only:
+    - main
+
+jobs:
+  include:
+    - stage: Build
+      name: 'Build Frontend Docker Image'
+      script:
+        - docker build -t $DOCKER_USERNAME/frontend:latest .
+        - docker images 
+      after_script:
+        - echo "$DOCKER_PASSWORD" | docker login -u "$DOCKER_USERNAME" --password-stdin
+        - docker tag $DOCKER_USERNAME/frontend:latest $DOCKER_USERNAME/frontend:build
+        - docker push $DOCKER_USERNAME/frontend:build
+
+    - stage: Test
+      name: 'Run Frontend Tests'
+      script:
+        - docker pull $DOCKER_USERNAME/frontend:build
+        - docker tag $DOCKER_USERNAME/frontend:build $DOCKER_USERNAME/frontend:test
+        - docker images
+        - docker run $DOCKER_USERNAME/frontend:test
+
+    - stage: Deploy
+      name: 'Deploy Frontend Docker Image'
+      script:
+        - echo "$DOCKER_PASSWORD" | docker login -u "$DOCKER_USERNAME" --password-stdin
+        - docker pull $DOCKER_USERNAME/frontend:build
+        - docker tag $DOCKER_USERNAME/frontend:build $DOCKER_USERNAME/frontend:latest
+        - docker images  
+        - docker push $DOCKER_USERNAME/frontend:latest
+        
+stages:
+  - name: Build
+  - name: Test
+  - name: Deploy
+
+before_deploy:
+  - echo "Starting deployment"
